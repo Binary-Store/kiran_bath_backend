@@ -11,7 +11,7 @@ class VerifyOtpRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return false;
+        return true;
     }
 
     /**
@@ -22,7 +22,16 @@ class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            //
+            'otp' => 'required|string|min:6|max:6',
+            'token' => 'required|string',
+        ];
+    }
+
+    public function messages()
+    {
+        return [
+            'otp.required' => 'OTP is required for verification.',
+            'token.required' => 'Token is missing, please resend OTP.',
         ];
     }
 }

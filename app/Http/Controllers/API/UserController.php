@@ -6,11 +6,11 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\VerifyOtpRequest;
 use App\Http\Requests\SignUpRequest; // Make sure to create this request class
 use App\Models\User;
-use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
 use App\Services\WhatsAppService;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 
 class UserController extends Controller
 {
@@ -32,7 +32,7 @@ class UserController extends Controller
             'gstNumber' => $request->gstNumber,
             'city' => $request->city,
             'exp' => time() + 600 // Valid for 10 minutes
-        ], env('JWT_SECRET'));
+        ], env('JWT_SECRET'),'HS256');
 
         // Generate OTP
         $otp = rand(100000, 999999);
@@ -42,6 +42,7 @@ class UserController extends Controller
             'token' => $tempToken,
             'otp' => $otp,
             'created_at' => now(),
+            'token_type' => 'otp',
             'expires_at' => now()->addMinutes(10), // Set expiration time
         ]);
 
@@ -65,8 +66,9 @@ class UserController extends Controller
         $tempToken = JWT::encode([
             'id' => $user->id,
             'phone' => $user->phone,
+            'token_type' => 'otp',
             'exp' => time() + 600 // Valid for 10 minutes
-        ], env('JWT_SECRET'));
+        ], env('JWT_SECRET'),'HS256');
 
         // Generate OTP
         $otp = rand(100000, 999999);
@@ -100,7 +102,17 @@ class UserController extends Controller
         }
 
         // Decode the token to retrieve user details
-        $payload = JWT::decode($request->token, env('JWT_SECRET'), ['HS256']);
+        try {
+            $payload = JWT::decode($request->token, new Key(env('JWT_SECRET'), 'HS256'));
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Invalid token'], 400);
+        }
+
+        //check token expiry
+        if ($payload->exp < time()) {
+            return response()->json(['message' => 'Otp expired'], 401);
+        }
+        
 
         // Check if it's a signup or login attempt
         $user = User::where('phone', $payload->phone)->first();
@@ -123,8 +135,9 @@ class UserController extends Controller
             'phone' => $user->phone,
             'gstNumber' => $user->gstNumber,
             'city' => $user->city,
-            'exp' => time() + (60 * 60 * 24 * 365) // Valid for 1 year
-        ], env('JWT_SECRET'));
+            'token_type' => 'auth',
+            'expires_in' => time() + (60 * 60 * 24 * 365) // Valid for 1 year
+        ], env('JWT_SECRET'),'HS256');
 
         // Clear the OTP record after successful verification
         DB::table('otps')->where('id', $otpRecord->id)->delete();
@@ -132,8 +145,6 @@ class UserController extends Controller
         return response()->json([
             'message' => 'OTP verified successfully!',
             'token' => $newJwtToken,
-            'token_type' => 'Bearer',
-            'expires_in' => 60 * 60 * 24 * 365 // 1 year in seconds
         ], 200);
     }
 }

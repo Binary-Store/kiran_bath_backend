@@ -12,12 +12,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('otps', function (Blueprint $table) {
-            $table->id(); // Primary key
-            $table->string('token')->unique(); // Unique token for each OTP request
-            $table->string('otp'); // OTP value
-            $table->timestamp('created_at')->nullable(); // Timestamp when OTP was created
-            $table->timestamp('expires_at')->nullable(); // Timestamp for when OTP expires
-            $table->timestamps(); // Additional timestamps (created_at, updated_at)
+            $table->id(); // Creates an auto-incrementing primary key
+            $table->text('token')->unique(); // Use `text` for larger token sizes
+            $table->string('otp'); // OTP column
+            $table->timestamps(); // Automatically create `created_at` and `updated_at` columns
+            $table->timestamp('expires_at'); // Expiration time for the OTP
         });
     }
 
